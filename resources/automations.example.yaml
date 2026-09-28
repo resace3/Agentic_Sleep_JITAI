@@ -1,0 +1,23 @@
+# SYNTHETIC example of an existing automations.yaml with ONE pre-existing,
+# protected automation (listed in interventions.protected_automation_ids).
+# The agent must never modify it; it matters for the duplicate and
+# notification-budget checks and makes `routine_completed` context-only.
+- id: '1700000000001'
+  alias: Bedtime routine reminder
+  description: Pre-existing reminder, not owned by the agent.
+  triggers:
+    - trigger: time
+      at: '21:45:00'
+  conditions:
+    - condition: template
+      alias: Routine not started since 17:00
+      value_template: >-
+        {% set last = states('event.bedtime_routine_button') %}
+        {{ last in ['unknown', 'unavailable']
+           or as_timestamp(last, 0) < as_timestamp(today_at('17:00')) }}
+  actions:
+    - action: notify.mobile_app_phone
+      data:
+        title: Time to wind down
+        message: Start your bedtime routine.
+  mode: single

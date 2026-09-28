@@ -1,0 +1,80 @@
+# Agentic Sleep JITAI - example configuration.
+#
+# Copy to resources/config.yaml (gitignored) and edit. Every value below is a
+# generic placeholder: replace entity ids and services with your own. As
+# shipped, this file runs the SYNTHETIC example with no Home Assistant needed.
+
+timezone: America/New_York        # IANA zone; every night boundary is local time
+
+goal:                              # entered once at setup; frames every decision
+  description: Sleep at least 7 hours on most nights, with a consistent bedtime.
+  primary_outcome: minutes_asleep
+  direction: increase              # increase | decrease
+
+# ---------------------------------------------------------------- data review
+analysis:
+  window_days: 30
+  min_valid_nights: 10             # fewer nights with sleep data -> "degraded", change nothing
+  min_nights_per_arm: 8            # a median-split arm smaller than this -> "insufficient evidence"
+  min_nights_per_half_arm: 3       # each arm in each half of the window needs at least this many
+  require_split_half: true
+  require_previous_run_confirmation: true
+  weekend_nights: [Fri, Sat]       # night_of weekdays reported separately for bedtime
+
+  # Pre-registered nightly-table columns. Decide these before looking at the
+  # data and do not add new ones mid-run (forking paths).
+  outcomes: [minutes_asleep, bed_offset_min]
+  predictors: [steps, evening_screen_min]
+  context_only: [routine_completed]  # shaped by an existing reminder: report it, never test it
+  pairs:                             # predictor -> outcome pairs tested every run
+    - [steps, minutes_asleep]
+    - [steps, bed_offset_min]
+    - [evening_screen_min, bed_offset_min]
+    - [evening_screen_min, minutes_asleep]
+
+# ------------------------------------------ Home Assistant data and delivery
+home_assistant:                     # the agent reads these via the Home Assistant REST API
+  automations_file: resources/automations.example.yaml  # real install: /config/automations.yaml
+  truncation_canary: binary_sensor.phone_interactive  # chatty entity; its window must span > 6 days
+  nightly_value_band: ["01:00", "18:00"]  # a wearable value landing on local date E in this band describes night E-1
+  max_gap_fraction: 0.2                   # a binary sensor unavailable for > 20% of its window -> null, never 0
+  signals:                                # nightly-table column -> entity and how to reduce it
+    bedtime:            {entity: sensor.sleep_start_time,     kind: nightly_value, value: clock}
+    wake_time:          {entity: sensor.sleep_end_time,       kind: nightly_value, value: clock}
+    minutes_asleep:     {entity: sensor.sleep_minutes_asleep, kind: nightly_value, zero_is_missing: true}
+    steps:              {entity: sensor.steps,                kind: daily_counter, aggregate: max}
+    evening_screen_min: {entity: binary_sensor.phone_interactive, kind: minutes_on, window: ["21:00", "23:00"]}
+    routine_completed:  {entity: event.bedtime_routine_button,    kind: event_in_window, window: ["17:00", "23:59"]}
+    # Optional extra signals, same pattern (add the column to analysis: to use it):
+    # evening_tv_min:   {entity: binary_sensor.tv_in_use, kind: minutes_on, window: ["21:00", "02:00"]}
+    # sedentary_min:    {entity: sensor.minutes_sedentary, kind: daily_counter, aggregate: min}  # counts DOWN
+
+# --------------------------------------------------------------- interventions
+interventions:
+  owned_alias_prefix: "Sleep JITAI - "  # the agent may only add/modify/remove automations with this prefix
+  max_active: 3                         # hard cap on owned automations, counted whether enabled or not
+  max_changes_per_run: 1                # one add, modify, remove or repair per run
+  protected_automation_ids: ["1700000000001"]  # pre-existing automations the agent must never touch
+  notify_service: notify.mobile_app_phone      # the only intervention delivery channel
+  notification_channel: sleep-jitai            # one place for the user to mute every intervention
+  budget:                          # across all owned interventions combined
+    max_pushes_per_day: 2          # stricter than max_active on purpose; the original install already had evening nudges
+    max_pushes_in_evening: 1
+    evening_window: ["20:00", "23:59"]
+    quiet_hours: ["23:59", "07:00"]  # never notify in this window
+    min_spacing_minutes: 30          # from any other owned or pre-existing reminder
+  duplicate_window_minutes: 45     # same behaviour targeted within +/- this many minutes -> duplicate
+  cooldown_days: 14                # no intervention structurally changed twice within this period
+  evaluation:
+    too_early_nights: 14           # younger than this -> TOO EARLY, protected from judgement
+    ineffective_after_nights: 21
+    ineffective_min_exposed_nights: 10
+    stale_after_nights: 60         # still not evaluable after this long -> STALE
+
+# -------------------------------------------------------------- human oversight
+oversight:
+  approval_mode: propose           # propose: write the change for a human to apply
+                                   # apply:   the agent edits automations itself (how the paper's runs worked)
+  operator_notify_service: ""      # optional failure alerts, e.g. notify.operator; never the intervention channel
+
+runtime_dir: runtime               # gitignored: history, run records, backups

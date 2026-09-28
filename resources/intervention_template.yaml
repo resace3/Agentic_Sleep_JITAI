@@ -1,0 +1,42 @@
+# Template for an agent-owned intervention (Home Assistant 2024.10+ plural keys).
+# <angle brackets> are placeholders. Never copy an invented number into a real
+# automation; every threshold must come from the run's findings.
+- id: '<epoch_millis>'                  # quoted, must not collide with existing ids
+  alias: Sleep JITAI - <short specific name>   # prefix = interventions.owned_alias_prefix
+  # The metadata line is load-bearing: a later run rebuilds its ledger from it
+  # if runtime/history is lost.
+  description: >-
+    sleep-jitai | created=<YYYY-MM-DD> | review_after=<YYYY-MM-DD> |
+    target=<nightly-table column> | direction=<increase|decrease> |
+    hypothesis=<one sentence> | evidence=<finding with n>
+  mode: single
+  max_exceeded: silent
+  # Deliberately an UPSTREAM trigger (TV running long early in the evening),
+  # not another clock-time bedtime push that would duplicate existing reminders.
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.tv_in_use
+      to: 'on'
+      for: '00:45:00'
+  conditions:
+    - condition: time
+      after: '20:00:00'
+      before: '21:30:00'
+    # mode: single does NOT stop re-firing across separate triggers; this is
+    # the real once-per-night guard.
+    - condition: template
+      alias: Once per night
+      value_template: >-
+        {{ this.attributes.last_triggered is none
+           or (now() - this.attributes.last_triggered).total_seconds() > 43200 }}
+  actions:
+    - action: notify.mobile_app_phone     # interventions.notify_service
+      data:
+        title: <short title>
+        message: <specific, actionable, not nagging>
+        data:
+          # Soft cue: ttl 3600 / priority normal. A cue tied to a specific
+          # moment needs ttl 0 / priority high, or Android may deliver it late.
+          ttl: 3600
+          priority: normal
+          channel: sleep-jitai            # one place for the user to mute everything

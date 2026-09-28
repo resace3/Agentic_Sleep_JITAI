@@ -1,0 +1,39 @@
+# Runtime state, logs and agent outputs: personal data, never commit
+runtime/
+runs/
+logs/
+output/
+outputs/
+history/
+records/
+backups/
+state/
+transcripts/
+*.log
+*.jsonl
+*.bak
+*.tmp
+*.sqlite
+*.db
+tmp/
+.cache/
+
+# Secrets and personal configuration
+.env
+.env.*
+!.env.example
+resources/config.yaml
+/automations.yaml
+*.pem
+*.key
+
+# Python / tooling
+__pycache__/
+*.pyc
+.venv/
+venv/
+.claude/
+.idea/
+.vscode/
+.DS_Store
+node_modules/

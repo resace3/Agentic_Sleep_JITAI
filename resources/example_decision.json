@@ -1,0 +1,129 @@
+{
+  "_note": "SYNTHETIC DATA - example decision record produced from resources/synthetic_sleep_data.csv; not a real person.",
+  "synthetic": true,
+  "run": {
+    "as_of": "2026-05-01",
+    "timezone": "America/New_York",
+    "approval_mode": "propose"
+  },
+  "data_window": {
+    "start": "2026-04-01",
+    "end": "2026-04-30",
+    "nights_in_window": 30,
+    "nights_with_sleep": 29,
+    "missing": [
+      "night 2026-04-12: no sleep data (wearable not synced)",
+      "night 2026-04-20: evening_screen_min missing",
+      "night 2026-04-25: routine_completed missing"
+    ]
+  },
+  "goal": {
+    "primary_outcome": "minutes_asleep",
+    "direction": "increase"
+  },
+  "findings": [
+    {
+      "pair": [
+        "steps",
+        "minutes_asleep"
+      ],
+      "n": 29,
+      "status": "candidate",
+      "confirmed": true,
+      "summary": "Nights with steps above 9505 (n=14) had a median minutes_asleep of 394.5 vs 365 on other nights (n=15). Association only."
+    },
+    {
+      "pair": [
+        "steps",
+        "bed_offset_min"
+      ],
+      "n": 29,
+      "status": "failed_split_half",
+      "confirmed": false,
+      "summary": null
+    },
+    {
+      "pair": [
+        "evening_screen_min",
+        "bed_offset_min"
+      ],
+      "n": 28,
+      "status": "failed_split_half",
+      "confirmed": false,
+      "summary": null
+    },
+    {
+      "pair": [
+        "evening_screen_min",
+        "minutes_asleep"
+      ],
+      "n": 28,
+      "status": "failed_split_half",
+      "confirmed": false,
+      "summary": null
+    }
+  ],
+  "bedtime": {
+    "all": {
+      "n": 29,
+      "median": "23:34"
+    },
+    "weekday": {
+      "n": 21,
+      "median": "23:21"
+    },
+    "weekend": {
+      "n": 8,
+      "median": "00:14"
+    }
+  },
+  "context_only": [
+    "routine_completed: shaped by the pre-existing Bedtime routine reminder; reported, not tested"
+  ],
+  "interventions_reviewed": [
+    {
+      "id": "1700000000001",
+      "alias": "Bedtime routine reminder",
+      "owned": false,
+      "verdict": "NOT_OWNED",
+      "reason": "protected pre-existing automation; used only for duplicate and burden checks"
+    }
+  ],
+  "candidates": [
+    {
+      "name": "Afternoon activity nudge",
+      "tier": "a",
+      "evidence": "Nights with steps above 9505 (n=14) had a median minutes_asleep of 394.5 vs 365 on other nights (n=15). Association only.",
+      "gates": {
+        "evidence": "pass",
+        "upstream": "pass",
+        "duplicate": "pass",
+        "budget": "pass",
+        "cooldown": "n/a"
+      },
+      "rejected_by": null
+    },
+    {
+      "name": "Evening screen-time cue",
+      "tier": "b",
+      "evidence": "evening_screen_min -> bed_offset_min failed split-half",
+      "gates": {
+        "evidence": "fail"
+      },
+      "rejected_by": "evidence (watchlist)"
+    }
+  ],
+  "decision": {
+    "procedure_step": 3,
+    "action": "add",
+    "reason": "0 of 3 owned slots used; one confirmed tier-(a) candidate passed all gates; 17:00 is outside the evening window and far from the 21:45 reminder"
+  },
+  "change": {
+    "applied": false,
+    "requires_approval": true,
+    "automation_yaml": "- id: '1777600000000'\n  alias: Sleep JITAI - Afternoon activity nudge\n  description: >-\n    sleep-jitai | created=2026-05-01 | review_after=2026-05-15 |\n    target=minutes_asleep | direction=increase |\n    hypothesis=A walk on low-step afternoons may raise steps and sleep duration. |\n    evidence=steps to minutes_asleep, n=29, split-half passed, confirmed 2026-04-30\n  mode: single\n  max_exceeded: silent\n  triggers:\n    - trigger: time\n      at: '17:00:00'\n  conditions:\n    - condition: numeric_state\n      entity_id: sensor.steps\n      below: 9505\n    - condition: template\n      alias: Once per day\n      value_template: >-\n        {{ this.attributes.last_triggered is none\n           or (now() - this.attributes.last_triggered).total_seconds() > 43200 }}\n  actions:\n    - action: notify.mobile_app_phone\n      data:\n        title: Afternoon activity check\n        message: A short walk now still counts toward today's steps.\n        data:\n          ttl: 3600\n          priority: normal\n          channel: sleep-jitai\n"
+  },
+  "active_interventions_after": [],
+  "errors": [],
+  "status": "ok"
+}
